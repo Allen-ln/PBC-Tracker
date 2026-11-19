@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PBC 资料清单跟踪看板</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">PBC</span>
+    <div>
+      <h1>资料清单跟踪看板</h1>
+      <p class="sub" id="projectMeta">加载中…</p>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="btnAdd" class="btn primary">+ 新增资料</button>
+    <button id="btnExport" class="btn">导出 CSV</button>
+    <button id="btnBackup" class="btn">备份</button>
+    <label class="btn" for="fileImport">恢复</label>
+    <input type="file" id="fileImport" accept="application/json" hidden>
+  </div>
+</header>
+
+<section class="kpis">
+  <div class="kpi">
+    <span class="label">资料条目</span>
+    <strong id="kpiTotal">–</strong>
+    <span class="hint" id="kpiTotalHint">含无需提供</span>
+  </div>
+  <div class="kpi accent">
+    <span class="label">已提供率</span>
+    <strong id="kpiRate">–</strong>
+    <span class="hint" id="kpiRateHint">按有效需求计算</span>
+  </div>
+  <div class="kpi warn">
+    <span class="label">已逾期</span>
+    <strong id="kpiOverdue">–</strong>
+    <span class="hint">超过承诺提供日</span>
+  </div>
+  <div class="kpi notice">
+    <span class="label">3 天内到期</span>
+    <strong id="kpiSoon">–</strong>
+    <span class="hint">需提前跟进</span>
+  </div>
+  <div class="kpi">
+    <span class="label">待提供</span>
+    <strong id="kpiPending">–</strong>
+    <span class="hint">尚未收到任何文件</span>
+  </div>
+</section>
+
+<section class="toolbar">
+  <input type="search" id="q" placeholder="搜索编号 / 资料名称 / 责任人 / 领域">
+  <select id="fStatus">
+    <option value="">全部状态</option>
+    <option value="pending">待提供</option>
+    <option value="partial">部分提供</option>
+    <option value="received">已提供</option>
+    <option value="verified">已核验</option>
+    <option value="waived">无需提供</option>
+  </select>
+  <select id="fOwner"><option value="">全部责任人</option></select>
+  <label class="chk"><input type="checkbox" id="fOverdue"> 仅看逾期</label>
+  <div class="spacer"></div>
+  <div class="segmented" id="viewSwitch">
+    <button data-view="table" class="active">表格</button>
+    <button data-view="board">看板</button>
+  </div>
+</section>
+
+<main>
+  <div id="tableView">
+    <table id="grid">
+      <thead>
+        <tr>
+          <th data-sort="no" class="sortable">编号</th>
+          <th data-sort="name" class="sortable">资料名称</th>
+          <th>审计领域</th>
+          <th>责任人</th>
+          <th data-sort="due" class="sortable">承诺日</th>
+          <th data-sort="left" class="sortable">剩余</th>
+          <th>状态</th>
+          <th>优先级</th>
+          <th class="ops">操作</th>
+        </tr>
+      </thead>
+      <tbody id="gridBody"></tbody>
+    </table>
+    <div class="empty" id="emptyTip" hidden>没有符合条件的资料。</div>
+  </div>
+  <div id="boardView" class="board" hidden></div>
+</main>
+
+<footer>
+  <span>数据保存在本机浏览器（localStorage），不上传任何服务器。</span>
+  <span id="lastSaved"></span>
+</footer>
+
+<!-- 新增 / 编辑弹窗 -->
+<div class="modal" id="modalEdit" hidden>
+  <div class="dialog">
+    <h2 id="editTitle">新增资料</h2>
+    <form id="editForm">
+      <input type="hidden" id="fId">
+      <div class="grid2">
+        <label>资料名称<span class="req">*</span>
+          <input type="text" id="fName" required maxlength="80" placeholder="如：应收账款账龄分析表">
+        </label>
+        <label>审计领域
+          <input type="text" id="fCat" maxlength="30" placeholder="如：应收账款">
+        </label>
+        <label>客户责任人
+          <input type="text" id="fOwner2" maxlength="30" placeholder="如：张敏（财务经理）">
+        </label>
+        <label>优先级
+          <select id="fPriority">
+            <option value="高">高</option>
+            <option value="中" selected>中</option>
+            <option value="低">低</option>
+          </select>
+        </label>
+        <label>请求日期
+          <input type="date" id="fRequested">
+        </label>
+        <label>承诺提供日
+          <input type="date" id="fDue">
+        </label>
+        <label>状态
+          <select id="fStatus2">
+            <option value="pending">待提供</option>
+            <option value="partial">部分提供</option>
+            <option value="received">已提供</option>
+            <option value="verified">已核验</option>
+            <option value="waived">无需提供</option>
+          </select>
+        </label>
+        <label>附件份数
+          <input type="number" id="fFiles" min="0" value="0">
+        </label>
+      </div>
+      <label class="full">备注
+        <textarea id="fNote" rows="2" maxlength="200" placeholder="如：已收到 1-9 月，10-12 月待补"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="btnCancelEdit">取消</button>
+        <button type="submit" class="btn primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 催办弹窗 -->
+<div class="modal" id="modalFollow" hidden>
+  <div class="dialog">
+    <h2>催办记录</h2>
+    <p class="follow-item" id="followItem"></p>
+    <div class="follow-script">
+      <div class="script-head">
+        <span>催办话术（可直接复制发送）</span>
+        <button class="btn mini" id="btnCopy">复制</button>
+      </div>
+      <pre id="followScript"></pre>
+    </div>
+    <label class="full">记录本次催办（可选）
+      <input type="text" id="followNote" maxlength="60" placeholder="如：微信联系张敏，回复周五提供">
+    </label>
+    <div class="follow-history" id="followHistory"></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" id="btnCancelFollow">关闭</button>
+      <button type="button" class="btn primary" id="btnSaveFollow">记录并催办</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
